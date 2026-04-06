@@ -13,7 +13,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _urlCtrl = TextEditingController(
-    text: 'https://svarga-api.YOUR_SUBDOMAIN.workers.dev',
+    text: 'https://svarga-admin-api.y-yoshida1031.workers.dev',
   );
   final _tokenCtrl = TextEditingController();
   bool _loading = false;
