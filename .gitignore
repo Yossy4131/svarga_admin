@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 環境設定（実際URL・シークレットを含む）
+lib/config/env.dart
+
+# Cloudflare Worker 設定（database_id を含む）
+cloudflare/wrangler.toml
