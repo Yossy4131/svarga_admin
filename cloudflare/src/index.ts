@@ -139,15 +139,20 @@ export default {
         }
         if (method === 'POST') {
           const body = await request.json<{
-            title?: string;
             event_date?: string;
+            recruitment_start?: string;
+            recruitment_end?: string;
+            recruitment_count?: number;
+            venue_capacity?: number;
             status?: string;
           }>();
-          if (!body.title?.trim()) return err('titleは必須です', 400, origin);
+          const autoTitle = body.event_date
+            ? new Date(body.event_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
+            : 'イベント';
           const result = await env.DB.prepare(
-            `INSERT INTO events (title, event_date, status) VALUES (?, ?, ?) RETURNING *`,
+            `INSERT INTO events (title, event_date, recruitment_start, recruitment_end, recruitment_count, venue_capacity, status) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
           )
-            .bind(body.title.trim(), body.event_date ?? null, body.status ?? 'upcoming')
+            .bind(autoTitle, body.event_date ?? null, body.recruitment_start ?? null, body.recruitment_end ?? null, body.recruitment_count ?? null, body.venue_capacity ?? null, body.status ?? 'upcoming')
             .first();
           return json(result, 201, origin);
         }
@@ -158,15 +163,20 @@ export default {
         const id = parseInt(evMatch[1]);
         if (method === 'PUT') {
           const body = await request.json<{
-            title: string;
             event_date?: string;
+            recruitment_start?: string;
+            recruitment_end?: string;
+            recruitment_count?: number;
+            venue_capacity?: number;
             status: string;
           }>();
-          if (!body.title?.trim()) return err('titleは必須です', 400, origin);
+          const autoTitle = body.event_date
+            ? new Date(body.event_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
+            : 'イベント';
           const result = await env.DB.prepare(
-            `UPDATE events SET title = ?, event_date = ?, status = ? WHERE id = ? RETURNING *`,
+            `UPDATE events SET title = ?, event_date = ?, recruitment_start = ?, recruitment_end = ?, recruitment_count = ?, venue_capacity = ?, status = ? WHERE id = ? RETURNING *`,
           )
-            .bind(body.title.trim(), body.event_date ?? null, body.status, id)
+            .bind(autoTitle, body.event_date ?? null, body.recruitment_start ?? null, body.recruitment_end ?? null, body.recruitment_count ?? null, body.venue_capacity ?? null, body.status, id)
             .first();
           if (!result) return err('Not found', 404, origin);
           return json(result, 200, origin);

@@ -138,7 +138,12 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                 ..._events.map(
                   (e) => DropdownMenuItem(
                     value: e,
-                    child: Text(e.title, overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      e.eventDate != null
+                          ? _formatDateShort(e.eventDate!)
+                          : 'イベント #${e.id}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ],
@@ -323,6 +328,15 @@ String _formatCreatedAt(String iso) {
     final dt = DateTime.parse(iso);
     return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  } catch (_) {
+    return iso;
+  }
+}
+
+String _formatDateShort(String iso) {
+  try {
+    final dt = DateTime.parse(iso);
+    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
   } catch (_) {
     return iso;
   }

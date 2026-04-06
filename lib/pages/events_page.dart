@@ -52,7 +52,7 @@ class _EventsPageState extends State<EventsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('削除確認'),
-        content: Text('「${event.title}」を削除しますか？'),
+        content: Text('${_formatDate(event.eventDate ?? '')} のイベントを削除しますか？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -175,7 +175,9 @@ class _EventTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  event.title,
+                  event.eventDate != null
+                      ? _formatDateShort(event.eventDate!)
+                      : '日付未定',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -183,15 +185,53 @@ class _EventTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  event.eventDate != null
-                      ? _formatDate(event.eventDate!)
-                      : '日付未定',
-                  style: const TextStyle(
-                    color: Color(0xFF8C90A1),
-                    fontSize: 13,
-                  ),
+                Row(
+                  children: [
+                    if (event.recruitmentCount != null) ...[
+                      const Icon(
+                        Icons.people_outline,
+                        size: 13,
+                        color: Color(0xFF8C90A1),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '募集${event.recruitmentCount}名',
+                        style: const TextStyle(
+                          color: Color(0xFF8C90A1),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    if (event.venueCapacity != null) ...[
+                      const Icon(
+                        Icons.store_outlined,
+                        size: 13,
+                        color: Color(0xFF8C90A1),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'キャパ${event.venueCapacity}名',
+                        style: const TextStyle(
+                          color: Color(0xFF8C90A1),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                if (event.recruitmentStart != null ||
+                    event.recruitmentEnd != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '募集: ${_formatDateShort(event.recruitmentStart)} 〜 ${_formatDateShort(event.recruitmentEnd)}',
+                      style: const TextStyle(
+                        color: Color(0xFF8C90A1),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -240,6 +280,18 @@ String _formatDate(String iso) {
   }
 }
 
+String _formatDateShort(String? iso) {
+  if (iso == null) return '未設定';
+  try {
+    final dt = DateTime.parse(iso);
+    return '${dt.year}/'
+        '${dt.month.toString().padLeft(2, '0')}/'
+        '${dt.day.toString().padLeft(2, '0')}';
+  } catch (_) {
+    return iso;
+  }
+}
+
 // ─── 作成/編集ダイアログ ────────────────────────────────────────────────────
 
 class _EventDialog extends StatefulWidget {
@@ -253,8 +305,11 @@ class _EventDialog extends StatefulWidget {
 }
 
 class _EventDialogState extends State<_EventDialog> {
-  late final TextEditingController _titleCtrl;
-  DateTime? _pickedDt;
+  DateTime? _eventDt;
+  DateTime? _recruitStartDt;
+  DateTime? _recruitEndDt;
+  late final TextEditingController _countCtrl;
+  late final TextEditingController _capacityCtrl;
   late String _status;
   bool _saving = false;
 
@@ -262,46 +317,53 @@ class _EventDialogState extends State<_EventDialog> {
   void initState() {
     super.initState();
     final ev = widget.event;
-    _titleCtrl = TextEditingController(text: ev?.title ?? '');
     _status = ev?.status ?? 'upcoming';
-    if (ev?.eventDate != null) {
-      _pickedDt = DateTime.tryParse(ev!.eventDate!);
-    }
+    if (ev?.eventDate != null) _eventDt = DateTime.tryParse(ev!.eventDate!);
+    if (ev?.recruitmentStart != null)
+      _recruitStartDt = DateTime.tryParse(ev!.recruitmentStart!);
+    if (ev?.recruitmentEnd != null)
+      _recruitEndDt = DateTime.tryParse(ev!.recruitmentEnd!);
+    _countCtrl = TextEditingController(
+      text: ev?.recruitmentCount?.toString() ?? '',
+    );
+    _capacityCtrl = TextEditingController(
+      text: ev?.venueCapacity?.toString() ?? '',
+    );
   }
 
   @override
   void dispose() {
-    _titleCtrl.dispose();
+    _countCtrl.dispose();
+    _capacityCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDateTime() async {
-    final date = await showDatePicker(
+  Future<DateTime?> _pickDate(DateTime? initial) async {
+    return showDatePicker(
       context: context,
-      initialDate: _pickedDt ?? DateTime.now(),
+      initialDate: initial ?? DateTime.now(),
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
     );
+  }
+
+  Future<void> _pickEventDateTime() async {
+    final date = await _pickDate(_eventDt);
     if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_pickedDt ?? DateTime.now()),
-    );
-    if (!mounted) return;
     setState(() {
-      _pickedDt = time != null
-          ? DateTime(date.year, date.month, date.day, time.hour, time.minute)
-          : DateTime(date.year, date.month, date.day);
+      _eventDt = DateTime(date.year, date.month, date.day);
     });
   }
 
   Future<void> _save() async {
-    if (_titleCtrl.text.trim().isEmpty) return;
     setState(() => _saving = true);
     try {
       final body = {
-        'title': _titleCtrl.text.trim(),
-        'event_date': _pickedDt?.toIso8601String(),
+        'event_date': _eventDt?.toIso8601String(),
+        'recruitment_start': _recruitStartDt?.toIso8601String(),
+        'recruitment_end': _recruitEndDt?.toIso8601String(),
+        'recruitment_count': int.tryParse(_countCtrl.text.trim()),
+        'venue_capacity': int.tryParse(_capacityCtrl.text.trim()),
         'status': _status,
       };
       if (widget.event == null) {
@@ -321,6 +383,45 @@ class _EventDialogState extends State<_EventDialog> {
     }
   }
 
+  Widget _dateTile({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+    bool showTime = false,
+  }) {
+    final text = value != null
+        ? (showTime
+              ? _formatDate(value.toIso8601String())
+              : _formatDateShort(value.toIso8601String()))
+        : '未選択';
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                text,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+        TextButton.icon(
+          onPressed: onTap,
+          icon: const Icon(Icons.calendar_today, size: 14),
+          label: const Text('選択', style: TextStyle(fontSize: 12)),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFFD4A870)),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.event != null;
@@ -330,46 +431,86 @@ class _EventDialogState extends State<_EventDialog> {
       title: Text(isEdit ? 'イベントを編集' : '新規イベント'),
       content: SizedBox(
         width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titleCtrl,
-              decoration: const InputDecoration(labelText: 'タイトル'),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _pickedDt != null
-                        ? _formatDate(_pickedDt!.toIso8601String())
-                        : '開催日時を選択',
-                    style: const TextStyle(color: Colors.white70),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 開催日
+              _dateTile(
+                label: '開催日',
+                value: _eventDt,
+                onTap: _pickEventDateTime,
+                showTime: false,
+              ),
+              const Divider(color: Colors.white12, height: 24),
+              // 募集期間
+              const Text(
+                '募集期間',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              _dateTile(
+                label: '開始日',
+                value: _recruitStartDt,
+                onTap: () async {
+                  final d = await _pickDate(_recruitStartDt);
+                  if (d != null) setState(() => _recruitStartDt = d);
+                },
+              ),
+              const SizedBox(height: 4),
+              _dateTile(
+                label: '終了日',
+                value: _recruitEndDt,
+                onTap: () async {
+                  final d = await _pickDate(_recruitEndDt);
+                  if (d != null) setState(() => _recruitEndDt = d);
+                },
+              ),
+              const Divider(color: Colors.white12, height: 24),
+              // 募集人数 / 店舒キャパ
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _countCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '募集人数',
+                        suffixText: '名',
+                      ),
+                    ),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: _pickDateTime,
-                  icon: const Icon(Icons.calendar_today, size: 16),
-                  label: const Text('選択'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // ignore: deprecated_member_use
-            DropdownButtonFormField<String>(
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _capacityCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '店舒キャパ',
+                        suffixText: '名',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // ステータス
               // ignore: deprecated_member_use
-              value: _status,
-              dropdownColor: const Color(0xFF111850),
-              decoration: const InputDecoration(labelText: 'ステータス'),
-              items: const [
-                DropdownMenuItem(value: 'upcoming', child: Text('開催予定')),
-                DropdownMenuItem(value: 'completed', child: Text('終了')),
-                DropdownMenuItem(value: 'cancelled', child: Text('キャンセル')),
-              ],
-              onChanged: (v) => setState(() => _status = v ?? _status),
-            ),
-          ],
+              DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: _status,
+                dropdownColor: const Color(0xFF111850),
+                decoration: const InputDecoration(labelText: 'ステータス'),
+                items: const [
+                  DropdownMenuItem(value: 'upcoming', child: Text('開催予定')),
+                  DropdownMenuItem(value: 'completed', child: Text('終了')),
+                  DropdownMenuItem(value: 'cancelled', child: Text('キャンセル')),
+                ],
+                onChanged: (v) => setState(() => _status = v ?? _status),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
