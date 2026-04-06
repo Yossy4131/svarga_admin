@@ -384,8 +384,8 @@ class _CastDialogState extends State<_CastDialog> {
             alignment: Alignment.center,
             children: [
               Container(
-                width: 140,
-                height: isFull ? 200 : 140,
+                width: 110,
+                height: 196,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: const Color(0x22B38246),
