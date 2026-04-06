@@ -22,6 +22,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: cloudflare
 
+      - name: Set Worker secrets
+        working-directory: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: echo "${{ secrets.ADMIN_TOKEN }}" | npx wrangler secret put ADMIN_TOKEN
+
   # ── 2. Flutter Web ビルド → Cloudflare Pages デプロイ ─────────────────
   deploy-pages:
     name: Deploy Flutter Web to Cloudflare Pages
@@ -33,7 +39,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.6'
+          flutter-version: "3.41.6"
           channel: stable
           cache: true
 
