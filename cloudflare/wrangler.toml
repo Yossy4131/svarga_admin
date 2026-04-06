@@ -14,6 +14,13 @@ database_name = "svarga-db"
 database_id = "ff06b26d-546f-4e77-95e8-050d6ecfa18a"
 
 # ───────────────────────────────────────────
+# R2 画像ストレージ
+# ───────────────────────────────────────────
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "svarga-images"
+
+# ───────────────────────────────────────────
 # シークレット（Dashboardまたは CLI で設定）
 #   wrangler secret put ADMIN_TOKEN
 # ───────────────────────────────────────────

@@ -4,6 +4,7 @@ class CastModel {
   final String role;
   final String message;
   final String? avatarUrl;
+  final String? avatarFullUrl;
   final String updatedAt;
 
   const CastModel({
@@ -12,6 +13,7 @@ class CastModel {
     required this.role,
     required this.message,
     required this.avatarUrl,
+    required this.avatarFullUrl,
     required this.updatedAt,
   });
 
@@ -21,6 +23,7 @@ class CastModel {
     role: j['role'] as String,
     message: j['message'] as String,
     avatarUrl: j['avatar_url'] as String?,
+    avatarFullUrl: j['avatar_full_url'] as String?,
     updatedAt: j['updated_at'] as String,
   );
 
@@ -29,5 +32,6 @@ class CastModel {
     'role': role,
     'message': message,
     'avatar_url': avatarUrl,
+    'avatar_full_url': avatarFullUrl,
   };
 }

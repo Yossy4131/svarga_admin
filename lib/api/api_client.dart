@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../models/event.dart';
 import '../models/application.dart';
@@ -105,6 +108,30 @@ class ApiClient {
   }
 
   // ── Casts ────────────────────────────────────────────────────────────────
+  /// 画像を R2 にアップロードして URL を返す
+  Future<String> uploadImage(Uint8List bytes, String mimeType) async {
+    final request = http.MultipartRequest(
+      'POST',
+      _uri('/api/admin/upload-image'),
+    );
+    request.headers['X-Admin-Token'] = token;
+    final ext = mimeType.contains('/')
+        ? mimeType.split('/').last.replaceAll('jpeg', 'jpg')
+        : 'jpg';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: 'upload.$ext',
+        contentType: MediaType.parse(mimeType),
+      ),
+    );
+    final streamed = await request.send();
+    final res = await http.Response.fromStream(streamed);
+    final data = await _parse(res) as Map<String, dynamic>;
+    return data['url'] as String;
+  }
+
   Future<List<CastModel>> getCasts() async {
     final res = await http.get(_uri('/api/admin/casts'), headers: _headers);
     final list = await _parse(res) as List<dynamic>;

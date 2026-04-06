@@ -155,10 +155,10 @@ class _CastTile extends StatelessWidget {
           CircleAvatar(
             radius: 22,
             backgroundColor: const Color(0x44B38246),
-            backgroundImage: cast.avatarUrl != null && cast.avatarUrl!.isNotEmpty
-                ? _resolveImageProvider(cast.avatarUrl!)
-                : null,
-            child: cast.avatarUrl == null || cast.avatarUrl!.isEmpty
+            backgroundImage: _resolveImage(
+              cast.avatarUrl ?? cast.avatarFullUrl,
+            ),
+            child: (cast.avatarUrl == null && cast.avatarFullUrl == null)
                 ? Text(
                     cast.name.isNotEmpty ? cast.name[0] : '?',
                     style: GoogleFonts.raleway(
@@ -222,7 +222,8 @@ class _CastTile extends StatelessWidget {
   }
 }
 
-ImageProvider _resolveImageProvider(String url) {
+ImageProvider? _resolveImage(String? url) {
+  if (url == null || url.isEmpty) return null;
   if (url.startsWith('data:')) {
     final comma = url.indexOf(',');
     if (comma != -1) {
@@ -251,10 +252,18 @@ class _CastDialogState extends State<_CastDialog> {
   late final TextEditingController _roleCtrl;
   late final TextEditingController _msgCtrl;
 
-  Uint8List? _imageBytes;
-  String _imageMimeType = 'image/jpeg';
-  String? _existingAvatarUrl;
-  bool _clearImage = false;
+  // 胸上画像
+  Uint8List? _bustBytes;
+  String _bustMime = 'image/jpeg';
+  String? _existingBustUrl;
+  bool _clearBust = false;
+
+  // 全身画像
+  Uint8List? _fullBytes;
+  String _fullMime = 'image/jpeg';
+  String? _existingFullUrl;
+  bool _clearFull = false;
+
   bool _saving = false;
 
   @override
@@ -264,7 +273,8 @@ class _CastDialogState extends State<_CastDialog> {
     _nameCtrl = TextEditingController(text: c?.name ?? '');
     _roleCtrl = TextEditingController(text: c?.role ?? 'キャスト');
     _msgCtrl = TextEditingController(text: c?.message ?? '');
-    _existingAvatarUrl = c?.avatarUrl;
+    _existingBustUrl = c?.avatarUrl;
+    _existingFullUrl = c?.avatarFullUrl;
   }
 
   @override
@@ -275,20 +285,25 @@ class _CastDialogState extends State<_CastDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
+  Future<void> _pick({required bool isFull}) async {
+    final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 400,
-      maxHeight: 400,
-      imageQuality: 80,
+      maxWidth: 2048,
+      maxHeight: 2048,
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
+    final mime = picked.mimeType ?? 'image/jpeg';
     setState(() {
-      _imageBytes = bytes;
-      _imageMimeType = picked.mimeType ?? 'image/jpeg';
-      _clearImage = false;
+      if (isFull) {
+        _fullBytes = bytes;
+        _fullMime = mime;
+        _clearFull = false;
+      } else {
+        _bustBytes = bytes;
+        _bustMime = mime;
+        _clearBust = false;
+      }
     });
   }
 
@@ -296,20 +311,32 @@ class _CastDialogState extends State<_CastDialog> {
     if (_nameCtrl.text.trim().isEmpty) return;
     setState(() => _saving = true);
     try {
-      String? avatarUrl;
-      if (_imageBytes != null) {
-        avatarUrl = 'data:$_imageMimeType;base64,${base64Encode(_imageBytes!)}';
-      } else if (_clearImage) {
-        avatarUrl = null;
+      // 胸上画像
+      String? bustUrl;
+      if (_bustBytes != null) {
+        bustUrl = await widget.client.uploadImage(_bustBytes!, _bustMime);
+      } else if (_clearBust) {
+        bustUrl = null;
       } else {
-        avatarUrl = _existingAvatarUrl;
+        bustUrl = _existingBustUrl;
+      }
+
+      // 全身画像
+      String? fullUrl;
+      if (_fullBytes != null) {
+        fullUrl = await widget.client.uploadImage(_fullBytes!, _fullMime);
+      } else if (_clearFull) {
+        fullUrl = null;
+      } else {
+        fullUrl = _existingFullUrl;
       }
 
       final body = {
         'name': _nameCtrl.text.trim(),
         'role': _roleCtrl.text.trim().isEmpty ? 'キャスト' : _roleCtrl.text.trim(),
         'message': _msgCtrl.text.trim(),
-        'avatar_url': avatarUrl,
+        'avatar_url': bustUrl,
+        'avatar_full_url': fullUrl,
       };
       if (widget.cast == null) {
         await widget.client.createCast(body);
@@ -328,75 +355,95 @@ class _CastDialogState extends State<_CastDialog> {
     }
   }
 
-  Widget _buildImagePicker() {
-    Widget avatar;
-    bool hasImage = false;
-
-    if (_imageBytes != null) {
-      avatar = CircleAvatar(
-        radius: 44,
-        backgroundImage: MemoryImage(_imageBytes!),
-      );
-      hasImage = true;
-    } else if (_existingAvatarUrl != null &&
-        _existingAvatarUrl!.isNotEmpty &&
-        !_clearImage) {
-      avatar = CircleAvatar(
-        radius: 44,
-        backgroundImage: _resolveImageProvider(_existingAvatarUrl!),
-      );
-      hasImage = true;
-    } else {
-      avatar = const CircleAvatar(
-        radius: 44,
-        backgroundColor: Color(0x44B38246),
-        child: Icon(Icons.add_a_photo, color: Colors.white70, size: 30),
-      );
-    }
+  Widget _imagePicker({
+    required String label,
+    required bool isFull,
+    required Uint8List? bytes,
+    required String? existingUrl,
+    required bool cleared,
+  }) {
+    final bool hasImage = bytes != null || (existingUrl != null && !cleared);
+    final ImageProvider? provider = bytes != null
+        ? MemoryImage(bytes)
+        : _resolveImage(existingUrl);
 
     return Column(
       children: [
-        Stack(
-          children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: avatar,
-            ),
-            if (hasImage)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: () => setState(() {
-                    _imageBytes = null;
-                    _clearImage = true;
-                  }),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFFF6B6B),
-                    ),
-                    padding: const EdgeInsets.all(3),
-                    child: const Icon(
-                      Icons.close,
-                      size: 14,
-                      color: Colors.white,
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFD4A870),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => _pick(isFull: isFull),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 140,
+                height: isFull ? 200 : 140,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0x22B38246),
+                  border: Border.all(color: const Color(0x44B38246)),
+                  image: hasImage && provider != null
+                      ? DecorationImage(image: provider, fit: BoxFit.cover)
+                      : null,
+                ),
+                child: !hasImage
+                    ? const Icon(
+                        Icons.add_a_photo,
+                        color: Colors.white38,
+                        size: 32,
+                      )
+                    : null,
+              ),
+              if (hasImage)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      if (isFull) {
+                        _fullBytes = null;
+                        _clearFull = true;
+                      } else {
+                        _bustBytes = null;
+                        _clearBust = true;
+                      }
+                    }),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFFF6B6B),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: const Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         TextButton.icon(
-          onPressed: _pickImage,
-          icon: const Icon(Icons.upload, size: 16),
+          onPressed: () => _pick(isFull: isFull),
+          icon: const Icon(Icons.upload, size: 14),
           label: Text(
-            hasImage ? '画像を変更' : '画像を選択',
-            style: const TextStyle(fontSize: 12),
+            hasImage ? '変更' : '選択',
+            style: const TextStyle(fontSize: 11),
           ),
           style: TextButton.styleFrom(
             foregroundColor: const Color(0xFFD4A870),
+            padding: EdgeInsets.zero,
           ),
         ),
       ],
@@ -406,7 +453,6 @@ class _CastDialogState extends State<_CastDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.cast != null;
-
     return AlertDialog(
       backgroundColor: const Color(0xFF111850),
       title: Text(isEdit ? 'キャストを編集' : 'キャストを追加'),
@@ -416,7 +462,28 @@ class _CastDialogState extends State<_CastDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildImagePicker(),
+              // 画像ピッカー 2枚並べ
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _imagePicker(
+                    label: '胸上画像',
+                    isFull: false,
+                    bytes: _bustBytes,
+                    existingUrl: _existingBustUrl,
+                    cleared: _clearBust,
+                  ),
+                  const SizedBox(width: 12),
+                  _imagePicker(
+                    label: '全身画像',
+                    isFull: true,
+                    bytes: _fullBytes,
+                    existingUrl: _existingFullUrl,
+                    cleared: _clearFull,
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: _nameCtrl,

@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   ADMIN_TOKEN: string;
+  IMAGES: R2Bucket;
 }
 
 function corsHeaders(origin: string): Record<string, string> {
@@ -66,6 +67,20 @@ export default {
       }
 
       // ──────────────────────────────────────────────
+      // Public: R2 画像配信
+      // ──────────────────────────────────────────────
+      if (method === 'GET' && path.startsWith('/api/images/')) {
+        const key = path.slice('/api/images/'.length);
+        if (!key) return err('Not found', 404, origin);
+        const obj = await env.IMAGES.get(key);
+        if (!obj) return err('Not found', 404, origin);
+        const headers = new Headers(corsHeaders(origin));
+        headers.set('Content-Type', obj.httpMetadata?.contentType ?? 'image/jpeg');
+        headers.set('Cache-Control', 'public, max-age=31536000');
+        return new Response(obj.body, { headers });
+      }
+
+      // ──────────────────────────────────────────────
       // Public: 来店応募
       // ──────────────────────────────────────────────
       if (method === 'POST' && path === '/api/apply') {
@@ -99,6 +114,20 @@ export default {
       // Admin routes（トークン検証）
       // ──────────────────────────────────────────────
       if (!isAdmin()) return err('Unauthorized', 401, origin);
+
+      // ── 画像アップロード ──────────────────────────────
+      if (method === 'POST' && path === '/api/admin/upload-image') {
+        const formData = await request.formData();
+        const file = formData.get('file') as File | null;
+        if (!file) return err('fileが必要です', 400, origin);
+        const ext = (file.type.split('/')[1] ?? 'jpg').replace('jpeg', 'jpg');
+        const key = `casts/${crypto.randomUUID()}.${ext}`;
+        await env.IMAGES.put(key, file.stream(), {
+          httpMetadata: { contentType: file.type },
+        });
+        const baseUrl = new URL(request.url).origin;
+        return json({ url: `${baseUrl}/api/images/${key}` }, 201, origin);
+      }
 
       // ── Events ──────────────────────────────────
       if (path === '/api/admin/events') {
@@ -197,16 +226,18 @@ export default {
             role?: string;
             message?: string;
             avatar_url?: string;
+            avatar_full_url?: string;
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
           const result = await env.DB.prepare(
-            `INSERT INTO casts (name, role, message, avatar_url) VALUES (?, ?, ?, ?) RETURNING *`,
+            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url) VALUES (?, ?, ?, ?, ?) RETURNING *`,
           )
             .bind(
               body.name.trim(),
               body.role ?? 'キャスト',
               body.message ?? '',
               body.avatar_url ?? null,
+              body.avatar_full_url ?? null,
             )
             .first();
           return json(result, 201, origin);
@@ -222,16 +253,18 @@ export default {
             role: string;
             message: string;
             avatar_url?: string;
+            avatar_full_url?: string;
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
           const result = await env.DB.prepare(
-            `UPDATE casts SET name = ?, role = ?, message = ?, avatar_url = ?, updated_at = datetime('now') WHERE id = ? RETURNING *`,
+            `UPDATE casts SET name = ?, role = ?, message = ?, avatar_url = ?, avatar_full_url = ?, updated_at = datetime('now') WHERE id = ? RETURNING *`,
           )
             .bind(
               body.name.trim(),
               body.role,
               body.message,
               body.avatar_url ?? null,
+              body.avatar_full_url ?? null,
               id,
             )
             .first();
