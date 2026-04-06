@@ -10,6 +10,6 @@ echo "=== flutter pub get ==="
 flutter pub get
 
 echo "=== flutter build web ==="
-flutter build web --release --web-renderer canvaskit
+flutter build web --release
 
 echo "=== Build complete: build/web ==="
