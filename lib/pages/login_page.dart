@@ -12,25 +12,23 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _urlCtrl = TextEditingController(
-    text: 'https://svarga-admin-api.y-yoshida1031.workers.dev',
-  );
+  static const _apiUrl =
+      'https://svarga-admin-api.y-yoshida1031.workers.dev';
+
   final _tokenCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
-    _urlCtrl.dispose();
     _tokenCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    final url = _urlCtrl.text.trim();
     final token = _tokenCtrl.text.trim();
-    if (url.isEmpty || token.isEmpty) {
-      setState(() => _error = 'URLとトークンを入力してください');
+    if (token.isEmpty) {
+      setState(() => _error = 'トークンを入力してください');
       return;
     }
     setState(() {
@@ -38,7 +36,7 @@ class _LoginPageState extends State<LoginPage> {
       _error = null;
     });
     try {
-      final client = ApiClient(baseUrl: url, token: token);
+      final client = ApiClient(baseUrl: _apiUrl, token: token);
       await client.verifyToken();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -47,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = '接続できません。URLを確認してください');
+      setState(() => _error = '接続できません。時間をおいて再試行してください');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,12 +77,6 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 6),
                 Text('管理画面にログイン', style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 32),
-                _Field(
-                  label: 'Workers API URL',
-                  controller: _urlCtrl,
-                  hint: 'https://svarga-api.xxx.workers.dev',
-                ),
-                const SizedBox(height: 16),
                 _Field(
                   label: 'Admin Token',
                   controller: _tokenCtrl,
