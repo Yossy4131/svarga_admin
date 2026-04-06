@@ -2,6 +2,6 @@
   "name": "svarga-admin-root",
   "private": true,
   "scripts": {
-    "deploy": "echo 'Worker is deployed separately via wrangler. See cloudflare/'"
+    "build": "echo 'Use GitHub Actions for deployment. See .github/workflows/deploy.yml'"
   }
 }
