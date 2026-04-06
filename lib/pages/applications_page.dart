@@ -5,8 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../api/api_client.dart';
+import '../constants/app_colors.dart';
 import '../models/application.dart';
 import '../models/event.dart';
+import '../utils/dialogs.dart';
+import '../utils/format_util.dart';
 
 class ApplicationsPage extends StatefulWidget {
   const ApplicationsPage({super.key, required this.client});
@@ -37,19 +40,29 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       ).showSnackBar(const SnackBar(content: Text('イベントがありません')));
       return;
     }
-    final winners = await showDialog<List<Application>>(
+    final result = await showDialog<_LotteryResult>(
       context: context,
       builder: (_) => _LotteryDialog(events: _events, apps: _apps),
     );
-    if (winners == null || winners.isEmpty || !mounted) return;
-    // 一括承認
-    for (final w in winners) {
+    if (result == null || !mounted) return;
+    // 当選者を approved に
+    for (final w in result.winners) {
       await _patchStatus(w, 'approved');
+    }
+    // 同開催日の残りの pending を rejected に
+    for (final l in result.losers) {
+      await _patchStatus(l, 'rejected');
     }
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('${winners.length}名を承認しました')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            '当選: ${result.winners.length}名、落選: ${result.losers.length}名',
+          ),
+        ),
+      );
     }
   }
 
@@ -103,25 +116,11 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   }
 
   Future<void> _delete(Application app) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('削除確認'),
-        content: Text('応募 #${app.id} (${app.vrchatId}) を削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('削除'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      '応募 #${app.id} (${app.vrchatId}) を削除しますか？',
     );
-    if (ok != true) return;
+    if (!confirmed) return;
     try {
       await widget.client.deleteApplication(app.id);
       if (mounted) setState(() => _apps.removeWhere((a) => a.id == app.id));
@@ -138,7 +137,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111850),
+        backgroundColor: AppColors.navyMid,
         title: Text(
           '応募一覧',
           style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
@@ -161,14 +160,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
             child: DropdownButtonFormField<Event?>(
               // ignore: deprecated_member_use
               value: _filterEvent,
-              dropdownColor: const Color(0xFF111850),
+              dropdownColor: AppColors.navyMid,
               decoration: InputDecoration(
                 labelText: '開催日で絞り込み',
                 filled: true,
-                fillColor: const Color(0x1AFFFFFF),
+                fillColor: AppColors.cardBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0x44FFFFFF)),
+                  borderSide: const BorderSide(color: AppColors.cardBorder),
                 ),
               ),
               items: [
@@ -199,7 +198,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                 ? Center(
                     child: Text(
                       _error!,
-                      style: const TextStyle(color: Color(0xFFFF6B6B)),
+                      style: const TextStyle(color: AppColors.red),
                     ),
                   )
                 : _apps.isEmpty
@@ -238,22 +237,22 @@ class _AppTile extends StatelessWidget {
   Color _statusColor() {
     switch (app.status) {
       case 'approved':
-        return const Color(0xFF4CAF50);
+        return AppColors.green;
       case 'rejected':
-        return const Color(0xFFFF6B6B);
+        return AppColors.red;
       default:
-        return const Color(0xFFB38246);
+        return AppColors.gold;
     }
   }
 
   String _statusLabel() {
     switch (app.status) {
       case 'approved':
-        return '承認';
+        return '当選';
       case 'rejected':
-        return '拒否';
+        return '落選';
       default:
-        return '未処理';
+        return '抽選前';
     }
   }
 
@@ -262,9 +261,9 @@ class _AppTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0x1AFFFFFF),
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x33FFFFFF)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         children: [
@@ -277,7 +276,7 @@ class _AppTile extends StatelessWidget {
                     const Icon(
                       Icons.person_outline,
                       size: 14,
-                      color: Color(0xFF93ABE8),
+                      color: AppColors.blueLight,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -295,13 +294,13 @@ class _AppTile extends StatelessWidget {
                     const Icon(
                       Icons.alternate_email,
                       size: 14,
-                      color: Color(0xFFD4A870),
+                      color: AppColors.goldLight,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       app.xId,
                       style: const TextStyle(
-                        color: Color(0xFF8C90A1),
+                        color: AppColors.muted,
                         fontSize: 13,
                       ),
                     ),
@@ -311,7 +310,7 @@ class _AppTile extends StatelessWidget {
                 Text(
                   _formatCreatedAt(app.createdAt),
                   style: const TextStyle(
-                    color: Color(0xFF5A5F72),
+                    color: AppColors.mutedDark,
                     fontSize: 11,
                   ),
                 ),
@@ -322,9 +321,9 @@ class _AppTile extends StatelessWidget {
             initialValue: app.status,
             onSelected: onStatus,
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'pending', child: Text('未処理')),
-              PopupMenuItem(value: 'approved', child: Text('承認')),
-              PopupMenuItem(value: 'rejected', child: Text('拒否')),
+              PopupMenuItem(value: 'pending', child: Text('抽選前')),
+              PopupMenuItem(value: 'approved', child: Text('当選')),
+              PopupMenuItem(value: 'rejected', child: Text('落選')),
             ],
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -352,7 +351,7 @@ class _AppTile extends StatelessWidget {
             icon: const Icon(
               Icons.delete_outlined,
               size: 18,
-              color: Color(0xFFFF6B6B),
+              color: AppColors.red,
             ),
           ),
         ],
@@ -361,23 +360,16 @@ class _AppTile extends StatelessWidget {
   }
 }
 
-String _formatCreatedAt(String iso) {
-  try {
-    final dt = DateTime.parse(iso);
-    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return iso;
-  }
-}
+String _formatCreatedAt(String iso) => formatDateTime(iso);
 
-String _formatDateShort(String iso) {
-  try {
-    final dt = DateTime.parse(iso);
-    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return iso;
-  }
+String _formatDateShort(String iso) => formatDate(iso);
+
+// ─── 抽選結果 ─────────────────────────────────────────────────────────────────
+
+class _LotteryResult {
+  const _LotteryResult({required this.winners, required this.losers});
+  final List<Application> winners;
+  final List<Application> losers;
 }
 
 // ─── 抽選ダイアログ ────────────────────────────────────────────────────────────
@@ -419,6 +411,17 @@ class _LotteryDialogState extends State<_LotteryDialog> {
     }).toList();
   }
 
+  /// 当選者以外で、同開催日の pending アプリ = 落選対象
+  List<Application> get _losers {
+    if (_winners == null || _selectedEvent == null) return [];
+    final winnerIds = _winners!.map((w) => w.id).toSet();
+    return widget.apps.where((a) {
+      return a.status == 'pending' &&
+          a.eventId == _selectedEvent!.id &&
+          !winnerIds.contains(a.id);
+    }).toList();
+  }
+
   void _runLottery() {
     final count = int.tryParse(_countCtrl.text.trim()) ?? 1;
     final pool = List<Application>.from(_candidates)..shuffle(Random());
@@ -433,10 +436,10 @@ class _LotteryDialogState extends State<_LotteryDialog> {
     final hasWinners = _winners != null && _winners!.isNotEmpty;
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF111850),
+      backgroundColor: AppColors.navyMid,
       title: Row(
         children: [
-          const Icon(Icons.casino_outlined, color: Color(0xFFD4A870)),
+          const Icon(Icons.casino_outlined, color: AppColors.goldLight),
           const SizedBox(width: 8),
           Text(
             '抽選',
@@ -454,7 +457,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
               // イベント選択
               DropdownButtonFormField<Event?>(
                 value: _selectedEvent,
-                dropdownColor: const Color(0xFF1a2060),
+                dropdownColor: AppColors.navyLight,
                 decoration: InputDecoration(
                   labelText: '対象開催日',
                   border: OutlineInputBorder(
@@ -487,7 +490,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   labelText: '当選人数',
-                  helperText: '対象: ${candidates.length}名 (pending)',
+                  helperText: '対象: ${candidates.length}名 (抽選前)',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -503,7 +506,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                   icon: const Icon(Icons.shuffle),
                   label: const Text('抽選する'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFB38246),
+                    backgroundColor: AppColors.gold,
                   ),
                 ),
               ),
@@ -513,7 +516,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                 Text(
                   '当選者 ${_winners!.length}名',
                   style: const TextStyle(
-                    color: Color(0xFFD4A870),
+                    color: AppColors.goldLight,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -536,7 +539,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                         const Icon(
                           Icons.emoji_events,
                           size: 16,
-                          color: Color(0xFF4CAF50),
+                          color: AppColors.green,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -554,7 +557,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                               Text(
                                 '@${w.xId}',
                                 style: const TextStyle(
-                                  color: Color(0xFF8C90A1),
+                                color: AppColors.muted,
                                   fontSize: 11,
                                 ),
                               ),
@@ -571,7 +574,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                   padding: EdgeInsets.only(top: 12),
                   child: Text(
                     '対象の応募者がいません',
-                    style: TextStyle(color: Color(0xFFFF6B6B)),
+                    style: TextStyle(color: AppColors.red),
                   ),
                 ),
             ],
@@ -585,11 +588,14 @@ class _LotteryDialogState extends State<_LotteryDialog> {
         ),
         if (hasWinners)
           FilledButton.icon(
-            onPressed: () => Navigator.pop(context, _winners),
+            onPressed: () => Navigator.pop(context, _LotteryResult(
+              winners: _winners!,
+              losers: _losers,
+            )),
             icon: const Icon(Icons.check),
-            label: const Text('当選者を承認'),
+            label: const Text('当選を確定する'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
+              backgroundColor: AppColors.green,
             ),
           ),
       ],

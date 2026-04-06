@@ -106,12 +106,24 @@ export default {
           event_id?: number | null;
         }>();
         if (!body.vrchat_id?.trim() || !body.x_id?.trim()) {
-          return err('VRChat IDとX IDは必須です', 400, origin);
+          return err('VRChat名とX IDは必須です', 400, origin);
         }
-        // 直近のupcomingイベントに自動紐付け
+        // 直近のupcominigイベントに自動紐付け
         const nextEvent = await env.DB.prepare(
           `SELECT id FROM events WHERE status = 'upcoming' ORDER BY event_date ASC LIMIT 1`,
         ).first<{ id: number }>();
+
+        const effectiveEventId = body.event_id ?? nextEvent?.id ?? null;
+
+        // 重複応募チェック: 同一VRChat ID × 同一開催日
+        if (effectiveEventId !== null) {
+          const duplicate = await env.DB.prepare(
+            `SELECT id FROM applications WHERE vrchat_id = ? AND event_id = ? LIMIT 1`,
+          ).bind(body.vrchat_id.trim(), effectiveEventId).first();
+          if (duplicate) {
+            return err('この開催日にはすでに応募済みです', 409, origin);
+          }
+        }
 
         const result = await env.DB.prepare(
           `INSERT INTO applications (vrchat_id, x_id, event_id) VALUES (?, ?, ?) RETURNING id`,
@@ -119,7 +131,7 @@ export default {
           .bind(
             body.vrchat_id.trim(),
             body.x_id.trim(),
-            body.event_id ?? nextEvent?.id ?? null,
+            effectiveEventId,
           )
           .first<{ id: number }>();
 

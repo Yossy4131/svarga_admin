@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../api/api_client.dart';
 import '../config/env.dart';
+import '../constants/app_colors.dart';
 import 'admin_shell.dart';
 
 class LoginPage extends StatefulWidget {
@@ -87,7 +88,7 @@ class _LoginPageState extends State<LoginPage> {
                   Text(
                     _error!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFFFF6B6B),
+                      color: AppColors.red,
                     ),
                   ),
                 ],
@@ -97,7 +98,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: FilledButton(
                     onPressed: _loading ? null : _login,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFB38246),
+                      backgroundColor: AppColors.gold,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: _loading

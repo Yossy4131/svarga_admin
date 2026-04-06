@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api/api_client.dart';
+import '../constants/app_colors.dart';
 import '../models/cast_model.dart';
+import '../utils/dialogs.dart';
 
 const _roleOptions = ['キャスト', 'スタッフ', 'バーテンダー'];
 
@@ -54,25 +56,11 @@ class _CastsPageState extends State<CastsPage> {
   }
 
   Future<void> _delete(CastModel cast) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('削除確認'),
-        content: Text('「${cast.name}」を削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('削除'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      '「${cast.name}」を削除しますか？',
     );
-    if (ok != true) return;
+    if (!confirmed) return;
     try {
       await widget.client.deleteCast(cast.id);
       _fetch();
@@ -107,7 +95,7 @@ class _CastsPageState extends State<CastsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111850),
+        backgroundColor: AppColors.navyMid,
         title: Text(
           'キャスト管理',
           style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
@@ -118,7 +106,7 @@ class _CastsPageState extends State<CastsPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showDialog(),
-        backgroundColor: const Color(0xFFB38246),
+        backgroundColor: AppColors.gold,
         icon: const Icon(Icons.person_add),
         label: const Text('追加'),
       ),
@@ -128,7 +116,7 @@ class _CastsPageState extends State<CastsPage> {
           ? Center(
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFFF6B6B)),
+                style: const TextStyle(color: AppColors.red),
               ),
             )
           : _casts.isEmpty
@@ -170,9 +158,9 @@ class _CastTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0x1AFFFFFF),
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x33FFFFFF)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         children: [
@@ -207,7 +195,7 @@ class _CastTile extends StatelessWidget {
                 Text(
                   cast.role,
                   style: const TextStyle(
-                    color: Color(0xFFD4A870),
+                    color: AppColors.goldLight,
                     fontSize: 12,
                   ),
                 ),
@@ -237,7 +225,7 @@ class _CastTile extends StatelessWidget {
             icon: const Icon(
               Icons.delete_outlined,
               size: 20,
-              color: Color(0xFFFF6B6B),
+              color: AppColors.red,
             ),
           ),
           const SizedBox(width: 32),
@@ -472,7 +460,7 @@ class _CastDialogState extends State<_CastDialog> {
             style: const TextStyle(fontSize: 11),
           ),
           style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFFD4A870),
+            foregroundColor: AppColors.goldLight,
             padding: EdgeInsets.zero,
           ),
         ),
@@ -484,7 +472,7 @@ class _CastDialogState extends State<_CastDialog> {
   Widget build(BuildContext context) {
     final isEdit = widget.cast != null;
     return AlertDialog(
-      backgroundColor: const Color(0xFF111850),
+      backgroundColor: AppColors.navyMid,
       title: Text(isEdit ? 'キャストを編集' : 'キャストを追加'),
       content: SizedBox(
         width: 400,
@@ -535,7 +523,7 @@ class _CastDialogState extends State<_CastDialog> {
                         () => _pendingRole = v ?? _roleOptions.first,
                       ),
                       decoration: const InputDecoration(labelText: '役職を選択'),
-                      dropdownColor: const Color(0xFF1a2060),
+                      dropdownColor: AppColors.navyLight,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -565,8 +553,8 @@ class _CastDialogState extends State<_CastDialog> {
                           deleteIcon: const Icon(Icons.close, size: 14),
                           onDeleted: () =>
                               setState(() => _selectedRoles.remove(r)),
-                          backgroundColor: const Color(0xFF1a2060),
-                          deleteIconColor: const Color(0xFFFF6B6B),
+                          backgroundColor: AppColors.navyLight,
+                          deleteIconColor: AppColors.red,
                           side: const BorderSide(color: Color(0x44B38246)),
                         ),
                       )
@@ -591,7 +579,7 @@ class _CastDialogState extends State<_CastDialog> {
         FilledButton(
           onPressed: _saving ? null : _save,
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFB38246),
+            backgroundColor: AppColors.gold,
           ),
           child: _saving
               ? const SizedBox(

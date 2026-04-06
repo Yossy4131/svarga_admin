@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../api/api_client.dart';
+import '../constants/app_colors.dart';
 import '../models/event.dart';
+import '../utils/dialogs.dart';
+import '../utils/format_util.dart';
 
 class EventsPage extends StatefulWidget {
   const EventsPage({super.key, required this.client});
@@ -48,28 +51,11 @@ class _EventsPageState extends State<EventsPage> {
   }
 
   Future<void> _delete(Event event) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('削除確認'),
-        content: Text('${_formatDate(event.eventDate ?? '')} のイベントを削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('削除'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      '${formatDate(event.eventDate)} のイベントを削除しますか？',
     );
-    if (ok != true) return;
+    if (!confirmed) return;
     try {
       await widget.client.deleteEvent(event.id);
       _fetch();
@@ -86,7 +72,7 @@ class _EventsPageState extends State<EventsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111850),
+        backgroundColor: AppColors.navyMid,
         title: Text(
           'イベント管理',
           style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
@@ -97,7 +83,7 @@ class _EventsPageState extends State<EventsPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showDialog(),
-        backgroundColor: const Color(0xFFB38246),
+        backgroundColor: AppColors.gold,
         icon: const Icon(Icons.add),
         label: const Text('新規作成'),
       ),
@@ -107,7 +93,7 @@ class _EventsPageState extends State<EventsPage> {
           ? Center(
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFFF6B6B)),
+                style: const TextStyle(color: AppColors.red),
               ),
             )
           : _events.isEmpty
@@ -143,11 +129,11 @@ class _EventTile extends StatelessWidget {
   Color _statusColor() {
     switch (event.status) {
       case 'upcoming':
-        return const Color(0xFF5B7DE8);
+        return AppColors.blue;
       case 'completed':
-        return const Color(0xFF4CAF50);
+        return AppColors.green;
       default:
-        return const Color(0xFF8C90A1);
+        return AppColors.muted;
     }
   }
 
@@ -167,9 +153,9 @@ class _EventTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0x1AFFFFFF),
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0x33FFFFFF)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         children: [
@@ -179,7 +165,7 @@ class _EventTile extends StatelessWidget {
               children: [
                 Text(
                   event.eventDate != null
-                      ? _formatDateShort(event.eventDate!)
+                      ? formatDate(event.eventDate!)
                       : '日付未定',
                   style: const TextStyle(
                     color: Colors.white,
@@ -200,7 +186,7 @@ class _EventTile extends StatelessWidget {
                       Text(
                         '募集${event.recruitmentCount}名',
                         style: const TextStyle(
-                          color: Color(0xFF8C90A1),
+                          color: AppColors.muted,
                           fontSize: 12,
                         ),
                       ),
@@ -216,7 +202,7 @@ class _EventTile extends StatelessWidget {
                       Text(
                         'キャパ${event.venueCapacity}名',
                         style: const TextStyle(
-                          color: Color(0xFF8C90A1),
+                          color: AppColors.muted,
                           fontSize: 12,
                         ),
                       ),
@@ -228,9 +214,9 @@ class _EventTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      '募集: ${_formatDateShort(event.recruitmentStart)} 〜 ${_formatDateShort(event.recruitmentEnd)}',
+                      '募集: ${formatDate(event.recruitmentStart)} 〜 ${formatDate(event.recruitmentEnd)}',
                       style: const TextStyle(
-                        color: Color(0xFF8C90A1),
+                        color: AppColors.muted,
                         fontSize: 12,
                       ),
                     ),
@@ -264,34 +250,12 @@ class _EventTile extends StatelessWidget {
             icon: const Icon(
               Icons.delete_outlined,
               size: 20,
-              color: Color(0xFFFF6B6B),
+              color: AppColors.red,
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-String _formatDate(String iso) {
-  try {
-    final dt = DateTime.parse(iso);
-    return '${dt.year}年${dt.month}月${dt.day}日'
-        '  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return iso;
-  }
-}
-
-String _formatDateShort(String? iso) {
-  if (iso == null) return '未設定';
-  try {
-    final dt = DateTime.parse(iso);
-    return '${dt.year}/'
-        '${dt.month.toString().padLeft(2, '0')}/'
-        '${dt.day.toString().padLeft(2, '0')}';
-  } catch (_) {
-    return iso;
   }
 }
 
@@ -394,8 +358,8 @@ class _EventDialogState extends State<_EventDialog> {
   }) {
     final text = value != null
         ? (showTime
-              ? _formatDate(value.toIso8601String())
-              : _formatDateShort(value.toIso8601String()))
+              ? formatDateLong(value.toIso8601String())
+              : formatDate(value.toIso8601String()))
         : '未選択';
     return Row(
       children: [
@@ -419,7 +383,7 @@ class _EventDialogState extends State<_EventDialog> {
           onPressed: onTap,
           icon: const Icon(Icons.calendar_today, size: 14),
           label: const Text('選択', style: TextStyle(fontSize: 12)),
-          style: TextButton.styleFrom(foregroundColor: const Color(0xFFD4A870)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.goldLight),
         ),
       ],
     );
@@ -430,7 +394,7 @@ class _EventDialogState extends State<_EventDialog> {
     final isEdit = widget.event != null;
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF111850),
+      backgroundColor: AppColors.navyMid,
       title: Text(isEdit ? 'イベントを編集' : '新規イベント'),
       content: SizedBox(
         width: 400,
@@ -503,7 +467,7 @@ class _EventDialogState extends State<_EventDialog> {
               DropdownButtonFormField<String>(
                 // ignore: deprecated_member_use
                 value: _status,
-                dropdownColor: const Color(0xFF111850),
+                dropdownColor: AppColors.navyMid,
                 decoration: const InputDecoration(labelText: 'ステータス'),
                 items: const [
                   DropdownMenuItem(value: 'upcoming', child: Text('開催予定')),
@@ -524,7 +488,7 @@ class _EventDialogState extends State<_EventDialog> {
         FilledButton(
           onPressed: _saving ? null : _save,
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFB38246),
+            backgroundColor: AppColors.gold,
           ),
           child: _saving
               ? const SizedBox(

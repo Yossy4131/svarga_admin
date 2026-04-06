@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import '../constants/app_colors.dart';
 import 'events_page.dart';
 import 'applications_page.dart';
 import 'casts_page.dart';
@@ -52,7 +53,7 @@ class _AdminShellState extends State<AdminShell> {
             body: Row(
               children: [
                 NavigationRail(
-                  backgroundColor: const Color(0xFF111850),
+                  backgroundColor: AppColors.navyMid,
                   selectedIndex: _index,
                   onDestinationSelected: (i) => setState(() => _index = i),
                   labelType: NavigationRailLabelType.all,
@@ -60,7 +61,7 @@ class _AdminShellState extends State<AdminShell> {
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: Icon(
                       Icons.shield_outlined,
-                      color: Color(0xFFB38246),
+                      color: AppColors.gold,
                       size: 28,
                     ),
                   ),
@@ -88,7 +89,7 @@ class _AdminShellState extends State<AdminShell> {
                     ),
                   ),
                 ),
-                const VerticalDivider(width: 1, color: Color(0x33FFFFFF)),
+                const VerticalDivider(width: 1, color: AppColors.cardBorder),
                 Expanded(child: pages[_index]),
               ],
             ),

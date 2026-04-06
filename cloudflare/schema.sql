@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS applications (
   created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- 同一VRChat ID × 同一開催日への重複応募をDB層で防止
+-- 注意: event_id = NULLのRowはSQLiteのNULLネィークプリシットのため制約対象外だが、
+--       Worker側でも同様のチェックを実施済み
+CREATE UNIQUE INDEX IF NOT EXISTS uq_applications_vrchat_event
+  ON applications (vrchat_id, event_id);
+
 CREATE TABLE IF NOT EXISTS casts (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   name        TEXT    NOT NULL,
