@@ -21,7 +21,9 @@ class AdminApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0B0F2E),
-        textTheme: GoogleFonts.ralewayTextTheme(ThemeData.dark().textTheme),
+        textTheme: GoogleFonts.shipporiMinchoTextTheme(
+          ThemeData.dark().textTheme,
+        ),
         useMaterial3: true,
       ),
       home: const LoginPage(),

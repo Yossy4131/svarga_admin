@@ -110,7 +110,7 @@ class _CastsPageState extends State<CastsPage> {
         backgroundColor: const Color(0xFF111850),
         title: Text(
           'キャスト管理',
-          style: GoogleFonts.raleway(fontWeight: FontWeight.w700),
+          style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(onPressed: _fetch, icon: const Icon(Icons.refresh)),
@@ -185,7 +185,7 @@ class _CastTile extends StatelessWidget {
             child: (cast.avatarUrl == null && cast.avatarFullUrl == null)
                 ? Text(
                     cast.name.isNotEmpty ? cast.name[0] : '?',
-                    style: GoogleFonts.raleway(
+                    style: GoogleFonts.shipporiMincho(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),

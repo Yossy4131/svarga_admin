@@ -12,8 +12,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _apiUrl =
-      'https://svarga-admin-api.y-yoshida1031.workers.dev';
+  static const _apiUrl = 'https://svarga-admin-api.y-yoshida1031.workers.dev';
 
   final _tokenCtrl = TextEditingController();
   bool _loading = false;
@@ -67,8 +66,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Text(
                   'Svarga Admin',
-                  style: GoogleFonts.raleway(
-                    fontSize: 32,
+                  style: GoogleFonts.shipporiMincho(
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: 2,
@@ -112,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
                           )
                         : Text(
                             'ログイン',
-                            style: GoogleFonts.raleway(
+                            style: GoogleFonts.shipporiMincho(
                               fontWeight: FontWeight.w700,
                             ),
                           ),

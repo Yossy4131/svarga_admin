@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../api/api_client.dart';
@@ -27,6 +30,29 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     _fetchAll();
   }
 
+  Future<void> _showLotteryDialog() async {
+    if (_events.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('イベントがありません')));
+      return;
+    }
+    final winners = await showDialog<List<Application>>(
+      context: context,
+      builder: (_) => _LotteryDialog(events: _events, apps: _apps),
+    );
+    if (winners == null || winners.isEmpty || !mounted) return;
+    // 一括承認
+    for (final w in winners) {
+      await _patchStatus(w, 'approved');
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${winners.length}名を承認しました')));
+    }
+  }
+
   Future<void> _fetchAll() async {
     setState(() {
       _loading = true;
@@ -41,6 +67,13 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       setState(() {
         _events = results[0] as List<Event>;
         _apps = results[1] as List<Application>;
+        // _filterEvent を新しいリストのインスタンスで再マッチ（参照ズレ防止）
+        if (_filterEvent != null) {
+          _filterEvent = (_events.cast<Event?>()).firstWhere(
+            (e) => e?.id == _filterEvent!.id,
+            orElse: () => null,
+          );
+        }
       });
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -108,9 +141,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         backgroundColor: const Color(0xFF111850),
         title: Text(
           '応募一覧',
-          style: GoogleFonts.raleway(fontWeight: FontWeight.w700),
+          style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
         ),
         actions: [
+          IconButton(
+            onPressed: _showLotteryDialog,
+            icon: const Icon(Icons.casino_outlined),
+            tooltip: '抽選',
+          ),
           IconButton(onPressed: _fetchAll, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -125,7 +163,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
               value: _filterEvent,
               dropdownColor: const Color(0xFF111850),
               decoration: InputDecoration(
-                labelText: 'イベントで絞り込み',
+                labelText: '開催日で絞り込み',
                 filled: true,
                 fillColor: const Color(0x1AFFFFFF),
                 border: OutlineInputBorder(
@@ -339,5 +377,222 @@ String _formatDateShort(String iso) {
     return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
   } catch (_) {
     return iso;
+  }
+}
+
+// ─── 抽選ダイアログ ────────────────────────────────────────────────────────────
+
+class _LotteryDialog extends StatefulWidget {
+  const _LotteryDialog({required this.events, required this.apps});
+
+  final List<Event> events;
+  final List<Application> apps;
+
+  @override
+  State<_LotteryDialog> createState() => _LotteryDialogState();
+}
+
+class _LotteryDialogState extends State<_LotteryDialog> {
+  Event? _selectedEvent;
+  final _countCtrl = TextEditingController(text: '1');
+  List<Application>? _winners;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedEvent = widget.events.isNotEmpty ? widget.events.first : null;
+  }
+
+  @override
+  void dispose() {
+    _countCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Application> get _candidates {
+    return widget.apps.where((a) {
+      if (a.status != 'pending') return false;
+      if (_selectedEvent != null && a.eventId != _selectedEvent!.id) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  void _runLottery() {
+    final count = int.tryParse(_countCtrl.text.trim()) ?? 1;
+    final pool = List<Application>.from(_candidates)..shuffle(Random());
+    setState(() {
+      _winners = pool.take(count.clamp(1, pool.length)).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = _candidates;
+    final hasWinners = _winners != null && _winners!.isNotEmpty;
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF111850),
+      title: Row(
+        children: [
+          const Icon(Icons.casino_outlined, color: Color(0xFFD4A870)),
+          const SizedBox(width: 8),
+          Text(
+            '抽選',
+            style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // イベント選択
+              DropdownButtonFormField<Event?>(
+                value: _selectedEvent,
+                dropdownColor: const Color(0xFF1a2060),
+                decoration: InputDecoration(
+                  labelText: '対象開催日',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                items: [
+                  ...widget.events.map(
+                    (e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(
+                        e.eventDate != null
+                            ? _formatDateShort(e.eventDate!)
+                            : 'イベント #${e.id}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() {
+                  _selectedEvent = v;
+                  _winners = null;
+                }),
+              ),
+              const SizedBox(height: 12),
+              // 人数
+              TextField(
+                controller: _countCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: '当選人数',
+                  helperText: '対象: ${candidates.length}名 (pending)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onChanged: (_) => setState(() => _winners = null),
+              ),
+              const SizedBox(height: 16),
+              // 抽選ボタン
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: candidates.isEmpty ? null : _runLottery,
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text('抽選する'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB38246),
+                  ),
+                ),
+              ),
+              // 結果
+              if (hasWinners) ...[
+                const SizedBox(height: 20),
+                Text(
+                  '当選者 ${_winners!.length}名',
+                  style: const TextStyle(
+                    color: Color(0xFFD4A870),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...(_winners!.map(
+                  (w) => Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2244BB44),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0x6644BB44)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.emoji_events,
+                          size: 16,
+                          color: Color(0xFF4CAF50),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                w.vrchatId,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                '@${w.xId}',
+                                style: const TextStyle(
+                                  color: Color(0xFF8C90A1),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+              ],
+              if (_winners != null && _winners!.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    '対象の応募者がいません',
+                    style: TextStyle(color: Color(0xFFFF6B6B)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('キャンセル'),
+        ),
+        if (hasWinners)
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, _winners),
+            icon: const Icon(Icons.check),
+            label: const Text('当選者を承認'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+            ),
+          ),
+      ],
+    );
   }
 }

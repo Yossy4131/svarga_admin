@@ -60,7 +60,10 @@ class _EventsPageState extends State<EventsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('削除'),
           ),
         ],
@@ -86,7 +89,7 @@ class _EventsPageState extends State<EventsPage> {
         backgroundColor: const Color(0xFF111850),
         title: Text(
           'イベント管理',
-          style: GoogleFonts.raleway(fontWeight: FontWeight.w700),
+          style: GoogleFonts.shipporiMincho(fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(onPressed: _fetch, icon: const Icon(Icons.refresh)),
@@ -468,7 +471,7 @@ class _EventDialogState extends State<_EventDialog> {
                 },
               ),
               const Divider(color: Colors.white12, height: 24),
-              // 募集人数 / 店舒キャパ
+              // 募集人数 / 店舗キャパ
               Row(
                 children: [
                   Expanded(
@@ -487,7 +490,7 @@ class _EventDialogState extends State<_EventDialog> {
                       controller: _capacityCtrl,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: '店舒キャパ',
+                        labelText: '店舗キャパ',
                         suffixText: '名',
                       ),
                     ),
