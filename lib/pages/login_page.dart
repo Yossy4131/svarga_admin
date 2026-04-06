@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../api/api_client.dart';
+import '../config/env.dart';
 import 'admin_shell.dart';
 
 class LoginPage extends StatefulWidget {
@@ -12,7 +13,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _apiUrl = 'https://svarga-admin-api.y-yoshida1031.workers.dev';
+  static const _apiUrl = Env.workerBaseUrl;
 
   final _tokenCtrl = TextEditingController();
   bool _loading = false;

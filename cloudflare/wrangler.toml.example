@@ -1,0 +1,28 @@
+name = "svarga-admin-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# ───────────────────────────────────────────
+# D1 データベース
+# 1. `wrangler d1 create svarga-db` を実行
+# 2. 出力された database_id をここに記入
+# ───────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "svarga-db"
+database_id = "YOUR_D1_DATABASE_ID"
+
+# ───────────────────────────────────────────
+# R2 画像ストレージ
+# ───────────────────────────────────────────
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "svarga-images"
+
+# ───────────────────────────────────────────
+# シークレット（Dashboardまたは CLI で設定）
+#   wrangler secret put ADMIN_TOKEN
+# ───────────────────────────────────────────
+# [vars]
+# ADMIN_TOKEN はセキュリティのため secrets に設定してください
