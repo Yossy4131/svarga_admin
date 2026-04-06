@@ -2,6 +2,7 @@
   "name": "svarga-admin-root",
   "private": true,
   "scripts": {
-    "build": "echo 'Use GitHub Actions for deployment. See .github/workflows/deploy.yml'"
+    "build": "echo 'Use GitHub Actions for deployment. See .github/workflows/deploy.yml'",
+    "deploy": "echo 'Deployment is handled by GitHub Actions. See .github/workflows/deploy.yml'"
   }
 }
