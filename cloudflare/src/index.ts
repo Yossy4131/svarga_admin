@@ -30,6 +30,21 @@ function err(message: string, status = 400, origin = '*'): Response {
   return json({ error: message }, status, origin);
 }
 
+/** 日本時間(JST = UTC+9)の現在時刻を 'YYYY-MM-DDTHH:MM:SS' 形式で返す */
+function nowJst(): string {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 19);
+}
+
+/**
+ * 開催日時が過去になった upcoming イベントを自動的に completed に変更する
+ */
+async function autoCompleteEvents(db: D1Database): Promise<void> {
+  await db
+    .prepare(`UPDATE events SET status = 'completed' WHERE status = 'upcoming' AND event_date IS NOT NULL AND event_date < ?`)
+    .bind(nowJst())
+    .run();
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = getAllowedOrigin(request);
@@ -50,6 +65,7 @@ export default {
       // Public: 次回開催イベント
       // ──────────────────────────────────────────────
       if (method === 'GET' && path === '/api/events/next') {
+        await autoCompleteEvents(env.DB);
         const result = await env.DB.prepare(
           `SELECT * FROM events WHERE status = 'upcoming' ORDER BY event_date ASC LIMIT 1`,
         ).first();
@@ -61,7 +77,7 @@ export default {
       // ──────────────────────────────────────────────
       if (method === 'GET' && path === '/api/casts') {
         const { results } = await env.DB.prepare(
-          `SELECT * FROM casts ORDER BY id ASC`,
+          `SELECT * FROM casts ORDER BY sort_order ASC, id ASC`,
         ).all();
         return json(results, 200, origin);
       }
@@ -132,6 +148,7 @@ export default {
       // ── Events ──────────────────────────────────
       if (path === '/api/admin/events') {
         if (method === 'GET') {
+          await autoCompleteEvents(env.DB);
           const { results } = await env.DB.prepare(
             `SELECT * FROM events ORDER BY event_date DESC`,
           ).all();
@@ -147,7 +164,7 @@ export default {
             status?: string;
           }>();
           const autoTitle = body.event_date
-            ? new Date(body.event_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
+            ? new Date(body.event_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
             : 'イベント';
           const result = await env.DB.prepare(
             `INSERT INTO events (title, event_date, recruitment_start, recruitment_end, recruitment_count, venue_capacity, status) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
@@ -171,7 +188,7 @@ export default {
             status: string;
           }>();
           const autoTitle = body.event_date
-            ? new Date(body.event_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
+            ? new Date(body.event_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric' }) + ' イベント'
             : 'イベント';
           const result = await env.DB.prepare(
             `UPDATE events SET title = ?, event_date = ?, recruitment_start = ?, recruitment_end = ?, recruitment_count = ?, venue_capacity = ?, status = ? WHERE id = ? RETURNING *`,
@@ -226,7 +243,7 @@ export default {
       if (path === '/api/admin/casts') {
         if (method === 'GET') {
           const { results } = await env.DB.prepare(
-            `SELECT * FROM casts ORDER BY id ASC`,
+            `SELECT * FROM casts ORDER BY sort_order ASC, id ASC`,
           ).all();
           return json(results, 200, origin);
         }
@@ -239,8 +256,13 @@ export default {
             avatar_full_url?: string;
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
+          // 現在の最大 sort_order を取得して末尾に追加
+          const maxRow = await env.DB.prepare(
+            `SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM casts`,
+          ).first<{ max_order: number }>();
+          const nextOrder = (maxRow?.max_order ?? -1) + 1;
           const result = await env.DB.prepare(
-            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url) VALUES (?, ?, ?, ?, ?) RETURNING *`,
+            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url, sort_order) VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
           )
             .bind(
               body.name.trim(),
@@ -248,10 +270,23 @@ export default {
               body.message ?? '',
               body.avatar_url ?? null,
               body.avatar_full_url ?? null,
+              nextOrder,
             )
             .first();
           return json(result, 201, origin);
         }
+      }
+
+      // キャスト並び替え
+      if (method === 'PUT' && path === '/api/admin/casts/reorder') {
+        if (!isAdmin()) return err('Unauthorized', 401, origin);
+        const body = await request.json<{ ids?: number[] }>();
+        if (!Array.isArray(body.ids)) return err('idsは必須です', 400, origin);
+        const stmts = body.ids.map((id, index) =>
+          env.DB.prepare(`UPDATE casts SET sort_order = ? WHERE id = ?`).bind(index, id),
+        );
+        await env.DB.batch(stmts);
+        return json({ success: true }, 200, origin);
       }
 
       const castMatch = path.match(/^\/api\/admin\/casts\/(\d+)$/);
@@ -267,7 +302,7 @@ export default {
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
           const result = await env.DB.prepare(
-            `UPDATE casts SET name = ?, role = ?, message = ?, avatar_url = ?, avatar_full_url = ?, updated_at = datetime('now') WHERE id = ? RETURNING *`,
+            `UPDATE casts SET name = ?, role = ?, message = ?, avatar_url = ?, avatar_full_url = ?, updated_at = datetime('now', '+9 hours') WHERE id = ? RETURNING *`,
           )
             .bind(
               body.name.trim(),
