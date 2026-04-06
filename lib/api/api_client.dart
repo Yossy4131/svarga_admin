@@ -158,6 +158,15 @@ class ApiClient {
     return CastModel.fromJson(await _parse(res) as Map<String, dynamic>);
   }
 
+  Future<void> reorderCasts(List<int> ids) async {
+    final res = await http.put(
+      _uri('/api/admin/casts/reorder'),
+      headers: _headers,
+      body: jsonEncode({'ids': ids}),
+    );
+    await _parse(res);
+  }
+
   Future<void> deleteCast(int id) async {
     final res = await http.delete(
       _uri('/api/admin/casts/$id'),

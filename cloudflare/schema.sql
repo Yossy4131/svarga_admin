@@ -24,5 +24,7 @@ CREATE TABLE IF NOT EXISTS casts (
   role        TEXT    NOT NULL DEFAULT 'キャスト',
   message     TEXT    NOT NULL DEFAULT '',
   avatar_url  TEXT,
+  avatar_full_url TEXT,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );

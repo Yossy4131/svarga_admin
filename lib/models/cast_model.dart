@@ -5,6 +5,7 @@ class CastModel {
   final String message;
   final String? avatarUrl;
   final String? avatarFullUrl;
+  final int sortOrder;
   final String updatedAt;
 
   const CastModel({
@@ -14,6 +15,7 @@ class CastModel {
     required this.message,
     required this.avatarUrl,
     required this.avatarFullUrl,
+    required this.sortOrder,
     required this.updatedAt,
   });
 
@@ -24,6 +26,7 @@ class CastModel {
     message: j['message'] as String,
     avatarUrl: j['avatar_url'] as String?,
     avatarFullUrl: j['avatar_full_url'] as String?,
+    sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
     updatedAt: j['updated_at'] as String,
   );
 

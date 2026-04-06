@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import '../api/api_client.dart';
 import '../models/cast_model.dart';
 
+const _roleOptions = ['キャスト', 'スタッフ', 'バーテンダー'];
+
 class CastsPage extends StatefulWidget {
   const CastsPage({super.key, required this.client});
 
@@ -83,6 +85,24 @@ class _CastsPageState extends State<CastsPage> {
     }
   }
 
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    setState(() {
+      final item = _casts.removeAt(oldIndex);
+      _casts.insert(newIndex, item);
+    });
+    try {
+      await widget.client.reorderCasts(_casts.map((c) => c.id).toList());
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+      _fetch(); // ロールバック
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,16 +133,20 @@ class _CastsPageState extends State<CastsPage> {
             )
           : _casts.isEmpty
           ? const Center(child: Text('キャストが登録されていません'))
-          : ListView.separated(
+          : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _casts.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              onReorder: _reorder,
               itemBuilder: (_, i) {
                 final c = _casts[i];
-                return _CastTile(
-                  cast: c,
-                  onEdit: () => _showDialog(cast: c),
-                  onDelete: () => _delete(c),
+                return Padding(
+                  key: ValueKey(c.id),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _CastTile(
+                    cast: c,
+                    onEdit: () => _showDialog(cast: c),
+                    onDelete: () => _delete(c),
+                  ),
                 );
               },
             ),
@@ -216,6 +240,7 @@ class _CastTile extends StatelessWidget {
               color: Color(0xFFFF6B6B),
             ),
           ),
+          const SizedBox(width: 32),
         ],
       ),
     );
@@ -249,8 +274,9 @@ class _CastDialog extends StatefulWidget {
 
 class _CastDialogState extends State<_CastDialog> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _roleCtrl;
   late final TextEditingController _msgCtrl;
+  List<String> _selectedRoles = [];
+  String _pendingRole = _roleOptions.first;
 
   // 胸上画像
   Uint8List? _bustBytes;
@@ -271,8 +297,13 @@ class _CastDialogState extends State<_CastDialog> {
     super.initState();
     final c = widget.cast;
     _nameCtrl = TextEditingController(text: c?.name ?? '');
-    _roleCtrl = TextEditingController(text: c?.role ?? 'キャスト');
     _msgCtrl = TextEditingController(text: c?.message ?? '');
+    _selectedRoles = (c?.role ?? '')
+        .split(',')
+        .map((r) => r.trim())
+        .where((r) => r.isNotEmpty)
+        .toList();
+    if (_selectedRoles.isEmpty) _selectedRoles = [_roleOptions.first];
     _existingBustUrl = c?.avatarUrl;
     _existingFullUrl = c?.avatarFullUrl;
   }
@@ -280,7 +311,6 @@ class _CastDialogState extends State<_CastDialog> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _roleCtrl.dispose();
     _msgCtrl.dispose();
     super.dispose();
   }
@@ -333,7 +363,7 @@ class _CastDialogState extends State<_CastDialog> {
 
       final body = {
         'name': _nameCtrl.text.trim(),
-        'role': _roleCtrl.text.trim().isEmpty ? 'キャスト' : _roleCtrl.text.trim(),
+        'role': _selectedRoles.isEmpty ? 'キャスト' : _selectedRoles.join(','),
         'message': _msgCtrl.text.trim(),
         'avatar_url': bustUrl,
         'avatar_full_url': fullUrl,
@@ -490,10 +520,59 @@ class _CastDialogState extends State<_CastDialog> {
                 decoration: const InputDecoration(labelText: '名前 *'),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _roleCtrl,
-                decoration: const InputDecoration(labelText: '役職'),
+              // 役職選択
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _pendingRole,
+                      items: _roleOptions
+                          .map(
+                            (r) => DropdownMenuItem(value: r, child: Text(r)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(
+                        () => _pendingRole = v ?? _roleOptions.first,
+                      ),
+                      decoration: const InputDecoration(labelText: '役職を選択'),
+                      dropdownColor: const Color(0xFF1a2060),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add_circle,
+                      color: Color(0xFFD4A870),
+                    ),
+                    tooltip: '追加',
+                    onPressed: () {
+                      if (!_selectedRoles.contains(_pendingRole)) {
+                        setState(() => _selectedRoles.add(_pendingRole));
+                      }
+                    },
+                  ),
+                ],
               ),
+              if (_selectedRoles.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: _selectedRoles
+                      .map(
+                        (r) => Chip(
+                          label: Text(r, style: const TextStyle(fontSize: 12)),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          onDeleted: () =>
+                              setState(() => _selectedRoles.remove(r)),
+                          backgroundColor: const Color(0xFF1a2060),
+                          deleteIconColor: const Color(0xFFFF6B6B),
+                          side: const BorderSide(color: Color(0x44B38246)),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _msgCtrl,
