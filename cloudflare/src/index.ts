@@ -56,6 +56,16 @@ export default {
       }
 
       // ──────────────────────────────────────────────
+      // Public: キャスト一覧
+      // ──────────────────────────────────────────────
+      if (method === 'GET' && path === '/api/casts') {
+        const { results } = await env.DB.prepare(
+          `SELECT * FROM casts ORDER BY id ASC`,
+        ).all();
+        return json(results, 200, origin);
+      }
+
+      // ──────────────────────────────────────────────
       // Public: 来店応募
       // ──────────────────────────────────────────────
       if (method === 'POST' && path === '/api/apply') {
