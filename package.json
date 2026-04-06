@@ -2,6 +2,6 @@
   "name": "svarga-admin-root",
   "private": true,
   "scripts": {
-    "deploy": "npm --prefix cloudflare install && npm --prefix cloudflare run deploy"
+    "deploy": "echo 'Worker is deployed separately via wrangler. See cloudflare/'"
   }
 }
