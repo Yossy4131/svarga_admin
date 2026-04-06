@@ -2,6 +2,6 @@
   "name": "svarga-admin-root",
   "private": true,
   "scripts": {
-    "deploy": "npm --prefix cloudflare ci && npm --prefix cloudflare run deploy"
+    "deploy": "npm --prefix cloudflare install && npm --prefix cloudflare run deploy"
   }
 }
