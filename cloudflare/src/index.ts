@@ -77,7 +77,7 @@ export default {
       // ──────────────────────────────────────────────
       if (method === 'GET' && path === '/api/casts') {
         const { results } = await env.DB.prepare(
-          `SELECT * FROM casts ORDER BY sort_order ASC, id ASC`,
+          `SELECT * FROM casts WHERE is_visible = 1 ORDER BY sort_order ASC, id ASC`,
         ).all();
         return json(results, 200, origin);
       }
@@ -274,7 +274,7 @@ export default {
           ).first<{ max_order: number }>();
           const nextOrder = (maxRow?.max_order ?? -1) + 1;
           const result = await env.DB.prepare(
-            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url, sort_order) VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?, 1) RETURNING *`,
           )
             .bind(
               body.name.trim(),
@@ -331,6 +331,15 @@ export default {
         if (method === 'DELETE') {
           await env.DB.prepare(`DELETE FROM casts WHERE id = ?`).bind(id).run();
           return json({ success: true }, 200, origin);
+        }
+        if (method === 'PATCH') {
+          const body = await request.json<{ is_visible?: number }>();
+          if (body.is_visible === undefined) return err('is_visibleは必須です', 400, origin);
+          const result = await env.DB.prepare(
+            `UPDATE casts SET is_visible = ?, updated_at = datetime('now', '+9 hours') WHERE id = ? RETURNING *`,
+          ).bind(body.is_visible, id).first();
+          if (!result) return err('Not found', 404, origin);
+          return json(result, 200, origin);
         }
       }
 

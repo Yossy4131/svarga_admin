@@ -91,6 +91,25 @@ class _CastsPageState extends State<CastsPage> {
     }
   }
 
+  Future<void> _toggleVisibility(CastModel cast) async {
+    try {
+      final updated = await widget.client.patchCastVisibility(
+        cast.id,
+        !cast.isVisible,
+      );
+      setState(() {
+        final idx = _casts.indexWhere((c) => c.id == cast.id);
+        if (idx != -1) _casts[idx] = updated;
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,6 +153,7 @@ class _CastsPageState extends State<CastsPage> {
                     cast: c,
                     onEdit: () => _showDialog(cast: c),
                     onDelete: () => _delete(c),
+                    onToggleVisibility: () => _toggleVisibility(c),
                   ),
                 );
               },
@@ -147,11 +167,13 @@ class _CastTile extends StatelessWidget {
     required this.cast,
     required this.onEdit,
     required this.onDelete,
+    required this.onToggleVisibility,
   });
 
   final CastModel cast;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onToggleVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +182,11 @@ class _CastTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(
+          color: cast.isVisible
+              ? AppColors.cardBorder
+              : Colors.red.withOpacity(0.4),
+        ),
       ),
       child: Row(
         children: [
@@ -199,6 +225,15 @@ class _CastTile extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+                if (!cast.isVisible)
+                  const Text(
+                    '非表示',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 if (cast.message.isNotEmpty)
                   Text(
                     cast.message,
@@ -211,6 +246,12 @@ class _CastTile extends StatelessWidget {
                   ),
               ],
             ),
+          ),
+          Switch(
+            value: cast.isVisible,
+            onChanged: (_) => onToggleVisibility(),
+            activeColor: AppColors.gold,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           IconButton(
             onPressed: onEdit,
@@ -578,9 +619,7 @@ class _CastDialogState extends State<_CastDialog> {
         ),
         FilledButton(
           onPressed: _saving ? null : _save,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.gold,
-          ),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.gold),
           child: _saving
               ? const SizedBox(
                   width: 16,

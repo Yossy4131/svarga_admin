@@ -174,4 +174,13 @@ class ApiClient {
     );
     await _parse(res);
   }
+
+  Future<CastModel> patchCastVisibility(int id, bool visible) async {
+    final res = await http.patch(
+      _uri('/api/admin/casts/$id'),
+      headers: _headers,
+      body: jsonEncode({'is_visible': visible ? 1 : 0}),
+    );
+    return CastModel.fromJson(await _parse(res) as Map<String, dynamic>);
+  }
 }

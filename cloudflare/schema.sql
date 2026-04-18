@@ -32,5 +32,9 @@ CREATE TABLE IF NOT EXISTS casts (
   avatar_url  TEXT,
   avatar_full_url TEXT,
   sort_order  INTEGER NOT NULL DEFAULT 0,
+  is_visible  INTEGER NOT NULL DEFAULT 1,             -- 1: 表示, 0: 非表示
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- 既存DBへのマイグレーション（初回のみ実行）:
+-- wrangler d1 execute svarga-db --remote --command="ALTER TABLE casts ADD COLUMN is_visible INTEGER NOT NULL DEFAULT 1;"
