@@ -10,7 +10,7 @@ import '../constants/app_colors.dart';
 import '../models/cast_model.dart';
 import '../utils/dialogs.dart';
 
-const _roleOptions = ['オーナー','店長', 'キャスト', 'スタッフ', 'バーテンダー'];
+const _roleOptions = ['オーナー', '店長', 'キャスト', 'スタッフ', 'バーテンダー'];
 
 class CastsPage extends StatefulWidget {
   const CastsPage({super.key, required this.client});
@@ -306,6 +306,7 @@ class _CastDialogState extends State<_CastDialog> {
   late final TextEditingController _msgCtrl;
   List<String> _selectedRoles = [];
   String _pendingRole = _roleOptions.first;
+  bool _isVisible = false;
 
   // 胸上画像
   Uint8List? _bustBytes;
@@ -333,6 +334,7 @@ class _CastDialogState extends State<_CastDialog> {
         .where((r) => r.isNotEmpty)
         .toList();
     // 役職未設定の場合は空のまま（ユーザーが選択する）
+    _isVisible = c?.isVisible ?? true;
     _existingBustUrl = c?.avatarUrl;
     _existingFullUrl = c?.avatarFullUrl;
   }
@@ -396,6 +398,7 @@ class _CastDialogState extends State<_CastDialog> {
         'message': _msgCtrl.text.trim(),
         'avatar_url': bustUrl,
         'avatar_full_url': fullUrl,
+        'is_visible': _isVisible ? 1 : 0,
       };
       if (widget.cast == null) {
         await widget.client.createCast(body);
@@ -607,6 +610,32 @@ class _CastDialogState extends State<_CastDialog> {
                 controller: _msgCtrl,
                 decoration: const InputDecoration(labelText: 'メッセージ'),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.visibility,
+                    size: 18,
+                    color: Color(0xFFD4A870),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('表示設定', style: TextStyle(fontSize: 14)),
+                  ),
+                  Switch(
+                    value: _isVisible,
+                    onChanged: (v) => setState(() => _isVisible = v),
+                    activeColor: AppColors.gold,
+                  ),
+                  Text(
+                    _isVisible ? '表示' : '非表示',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _isVisible ? AppColors.goldLight : AppColors.red,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
