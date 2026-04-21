@@ -49,17 +49,20 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     for (final w in result.winners) {
       await _patchStatus(w, 'approved');
     }
-    // 同開催日の残りの pending を rejected に
-    for (final l in result.losers) {
-      await _patchStatus(l, 'rejected');
+    // 再抽選時は落選者のステータスは変更しない
+    if (!result.isReDraw) {
+      // 同開催日の残りの pending を rejected に
+      for (final l in result.losers) {
+        await _patchStatus(l, 'rejected');
+      }
     }
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '当選: ${result.winners.length}名、落選: ${result.losers.length}名',
+            result.isReDraw
+                ? '再抽選: 当選 ${result.winners.length}名'
+                : '当選: ${result.winners.length}名、落選: ${result.losers.length}名',
           ),
         ),
       );
@@ -240,6 +243,8 @@ class _AppTile extends StatelessWidget {
         return AppColors.green;
       case 'rejected':
         return AppColors.red;
+      case 'skipped':
+        return const Color(0xFFFF9800); // orange
       default:
         return AppColors.gold;
     }
@@ -251,6 +256,8 @@ class _AppTile extends StatelessWidget {
         return '当選';
       case 'rejected':
         return '落選';
+      case 'skipped':
+        return '見送り';
       default:
         return '抽選前';
     }
@@ -324,6 +331,7 @@ class _AppTile extends StatelessWidget {
               PopupMenuItem(value: 'pending', child: Text('抽選前')),
               PopupMenuItem(value: 'approved', child: Text('当選')),
               PopupMenuItem(value: 'rejected', child: Text('落選')),
+              PopupMenuItem(value: 'skipped', child: Text('見送り')),
             ],
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -367,9 +375,14 @@ String _formatDateShort(String iso) => formatDate(iso);
 // ─── 抽選結果 ─────────────────────────────────────────────────────────────────
 
 class _LotteryResult {
-  const _LotteryResult({required this.winners, required this.losers});
+  const _LotteryResult({
+    required this.winners,
+    required this.losers,
+    this.isReDraw = false,
+  });
   final List<Application> winners;
   final List<Application> losers;
+  final bool isReDraw;
 }
 
 // ─── 抽選ダイアログ ────────────────────────────────────────────────────────────
@@ -388,6 +401,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
   Event? _selectedEvent;
   final _countCtrl = TextEditingController(text: '1');
   List<Application>? _winners;
+  bool _reDrawMode = false; // true: 落選者から再抽選
 
   @override
   void initState() {
@@ -403,7 +417,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
 
   List<Application> get _candidates {
     return widget.apps.where((a) {
-      if (a.status != 'pending') return false;
+      if (a.status != (_reDrawMode ? 'rejected' : 'pending')) return false;
       if (_selectedEvent != null && a.eventId != _selectedEvent!.id) {
         return false;
       }
@@ -415,6 +429,10 @@ class _LotteryDialogState extends State<_LotteryDialog> {
   List<Application> get _losers {
     if (_winners == null || _selectedEvent == null) return [];
     final winnerIds = _winners!.map((w) => w.id).toSet();
+    if (_reDrawMode) {
+      // 再抽選時は落選者のステータスを変更しない
+      return [];
+    }
     return widget.apps.where((a) {
       return a.status == 'pending' &&
           a.eventId == _selectedEvent!.id &&
@@ -490,12 +508,53 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   labelText: '当選人数',
-                  helperText: '対象: ${candidates.length}名 (抽選前)',
+                  helperText:
+                      '対象: ${candidates.length}名 (${_reDrawMode ? '落選者' : '抽選前'})',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 onChanged: (_) => setState(() => _winners = null),
+              ),
+              const SizedBox(height: 12),
+              // 再抽選モードトグル
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _reDrawMode
+                      ? const Color(0x22FF9800)
+                      : AppColors.navyLight.withAlpha(80),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _reDrawMode
+                        ? const Color(0x66FF9800)
+                        : AppColors.cardBorder,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.replay,
+                      size: 16,
+                      color: Color(0xFFFF9800),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('落選者から再抽選', style: TextStyle(fontSize: 13)),
+                    ),
+                    Switch(
+                      value: _reDrawMode,
+                      onChanged: (v) => setState(() {
+                        _reDrawMode = v;
+                        _winners = null;
+                      }),
+                      activeColor: const Color(0xFFFF9800),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               // 抽選ボタン
@@ -557,7 +616,7 @@ class _LotteryDialogState extends State<_LotteryDialog> {
                               Text(
                                 '@${w.xId}',
                                 style: const TextStyle(
-                                color: AppColors.muted,
+                                  color: AppColors.muted,
                                   fontSize: 11,
                                 ),
                               ),
@@ -588,15 +647,17 @@ class _LotteryDialogState extends State<_LotteryDialog> {
         ),
         if (hasWinners)
           FilledButton.icon(
-            onPressed: () => Navigator.pop(context, _LotteryResult(
-              winners: _winners!,
-              losers: _losers,
-            )),
-            icon: const Icon(Icons.check),
-            label: const Text('当選を確定する'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.green,
+            onPressed: () => Navigator.pop(
+              context,
+              _LotteryResult(
+                winners: _winners!,
+                losers: _losers,
+                isReDraw: _reDrawMode,
+              ),
             ),
+            icon: const Icon(Icons.check),
+            label: Text(_reDrawMode ? '再抽選を確定する' : '当選を確定する'),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.green),
           ),
       ],
     );
