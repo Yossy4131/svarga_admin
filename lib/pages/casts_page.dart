@@ -334,7 +334,7 @@ class _CastDialogState extends State<_CastDialog> {
         .where((r) => r.isNotEmpty)
         .toList();
     // 役職未設定の場合は空のまま（ユーザーが選択する）
-    _isVisible = c?.isVisible ?? true;
+    _isVisible = c?.isVisible ?? false;
     _existingBustUrl = c?.avatarUrl;
     _existingFullUrl = c?.avatarFullUrl;
   }
