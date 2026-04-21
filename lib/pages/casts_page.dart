@@ -10,7 +10,7 @@ import '../constants/app_colors.dart';
 import '../models/cast_model.dart';
 import '../utils/dialogs.dart';
 
-const _roleOptions = ['キャスト', 'スタッフ', 'バーテンダー'];
+const _roleOptions = ['オーナー','店長', 'キャスト', 'スタッフ', 'バーテンダー'];
 
 class CastsPage extends StatefulWidget {
   const CastsPage({super.key, required this.client});
@@ -332,7 +332,7 @@ class _CastDialogState extends State<_CastDialog> {
         .map((r) => r.trim())
         .where((r) => r.isNotEmpty)
         .toList();
-    if (_selectedRoles.isEmpty) _selectedRoles = [_roleOptions.first];
+    // 役職未設定の場合は空のまま（ユーザーが選択する）
     _existingBustUrl = c?.avatarUrl;
     _existingFullUrl = c?.avatarFullUrl;
   }
@@ -392,7 +392,7 @@ class _CastDialogState extends State<_CastDialog> {
 
       final body = {
         'name': _nameCtrl.text.trim(),
-        'role': _selectedRoles.isEmpty ? 'キャスト' : _selectedRoles.join(','),
+        'role': _selectedRoles.join(','),
         'message': _msgCtrl.text.trim(),
         'avatar_url': bustUrl,
         'avatar_full_url': fullUrl,
