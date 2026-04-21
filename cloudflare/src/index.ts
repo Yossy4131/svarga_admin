@@ -64,7 +64,7 @@ export default {
       // ──────────────────────────────────────────────
       // Public: 次回開催イベント
       // ──────────────────────────────────────────────
-      if (method === 'GET' && path === '/api/events/next') {
+      if (method === 'GET' && path === '/api/schedule/next') {
         await autoCompleteEvents(env.DB);
         const result = await env.DB.prepare(
           `SELECT * FROM events WHERE status = 'upcoming' ORDER BY event_date ASC LIMIT 1`,
