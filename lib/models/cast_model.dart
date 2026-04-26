@@ -1,6 +1,7 @@
 class CastModel {
   final int id;
   final String name;
+  final String? alias;
   final String role;
   final String message;
   final String? avatarUrl;
@@ -12,6 +13,7 @@ class CastModel {
   const CastModel({
     required this.id,
     required this.name,
+    this.alias,
     required this.role,
     required this.message,
     required this.avatarUrl,
@@ -21,9 +23,13 @@ class CastModel {
     required this.updatedAt,
   });
 
+  /// 表示名: 源氏名 > 本名
+  String get displayName => (alias?.isNotEmpty == true) ? alias! : name;
+
   factory CastModel.fromJson(Map<String, dynamic> j) => CastModel(
     id: j['id'] as int,
     name: j['name'] as String,
+    alias: j['alias'] as String?,
     role: j['role'] as String,
     message: j['message'] as String,
     avatarUrl: j['avatar_url'] as String?,
@@ -35,6 +41,7 @@ class CastModel {
 
   Map<String, dynamic> toJson() => {
     'name': name,
+    'alias': alias,
     'role': role,
     'message': message,
     'avatar_url': avatarUrl,

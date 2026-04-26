@@ -198,7 +198,7 @@ class _CastTile extends StatelessWidget {
             ),
             child: (cast.avatarUrl == null && cast.avatarFullUrl == null)
                 ? Text(
-                    cast.name.isNotEmpty ? cast.name[0] : '?',
+                    cast.displayName.isNotEmpty ? cast.displayName[0] : '?',
                     style: GoogleFonts.shipporiMincho(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -212,7 +212,9 @@ class _CastTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  cast.name,
+                  cast.alias != null && cast.alias!.isNotEmpty
+                      ? '${cast.alias}（本名: ${cast.name}）'
+                      : cast.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -303,6 +305,7 @@ class _CastDialog extends StatefulWidget {
 
 class _CastDialogState extends State<_CastDialog> {
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _aliasCtrl;
   late final TextEditingController _msgCtrl;
   List<String> _selectedRoles = [];
   String _pendingRole = _roleOptions.first;
@@ -327,6 +330,7 @@ class _CastDialogState extends State<_CastDialog> {
     super.initState();
     final c = widget.cast;
     _nameCtrl = TextEditingController(text: c?.name ?? '');
+    _aliasCtrl = TextEditingController(text: c?.alias ?? '');
     _msgCtrl = TextEditingController(text: c?.message ?? '');
     _selectedRoles = (c?.role ?? '')
         .split(',')
@@ -342,6 +346,7 @@ class _CastDialogState extends State<_CastDialog> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _aliasCtrl.dispose();
     _msgCtrl.dispose();
     super.dispose();
   }
@@ -394,6 +399,7 @@ class _CastDialogState extends State<_CastDialog> {
 
       final body = {
         'name': _nameCtrl.text.trim(),
+        'alias': _aliasCtrl.text.trim().isEmpty ? null : _aliasCtrl.text.trim(),
         'role': _selectedRoles.join(','),
         'message': _msgCtrl.text.trim(),
         'avatar_url': bustUrl,
@@ -549,7 +555,15 @@ class _CastDialogState extends State<_CastDialog> {
               const SizedBox(height: 16),
               TextField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: '名前 *'),
+                decoration: const InputDecoration(labelText: '本名 *'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _aliasCtrl,
+                decoration: const InputDecoration(
+                  labelText: '源氏名（任意）',
+                  helperText: '入力すると公開サイトでは源氏名が表示されます',
+                ),
               ),
               const SizedBox(height: 12),
               // 役職選択

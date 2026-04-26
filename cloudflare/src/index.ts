@@ -267,6 +267,7 @@ export default {
             avatar_url?: string;
             avatar_full_url?: string;
             is_visible?: number;
+            alias?: string;
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
           // 現在の最大 sort_order を取得して末尾に追加
@@ -275,10 +276,11 @@ export default {
           ).first<{ max_order: number }>();
           const nextOrder = (maxRow?.max_order ?? -1) + 1;
           const result = await env.DB.prepare(
-            `INSERT INTO casts (name, role, message, avatar_url, avatar_full_url, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            `INSERT INTO casts (name, alias, role, message, avatar_url, avatar_full_url, sort_order, is_visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
           )
             .bind(
               body.name.trim(),
+              body.alias?.trim() || null,
               body.role ?? 'キャスト',
               body.message ?? '',
               body.avatar_url ?? null,
@@ -314,13 +316,15 @@ export default {
             avatar_url?: string;
             avatar_full_url?: string;
             is_visible?: number;
+            alias?: string;
           }>();
           if (!body.name?.trim()) return err('nameは必須です', 400, origin);
           const result = await env.DB.prepare(
-            `UPDATE casts SET name = ?, role = ?, message = ?, avatar_url = ?, avatar_full_url = ?, is_visible = COALESCE(?, is_visible), updated_at = datetime('now', '+9 hours') WHERE id = ? RETURNING *`,
+            `UPDATE casts SET name = ?, alias = ?, role = ?, message = ?, avatar_url = ?, avatar_full_url = ?, is_visible = COALESCE(?, is_visible), updated_at = datetime('now', '+9 hours') WHERE id = ? RETURNING *`,
           )
             .bind(
               body.name.trim(),
+              body.alias?.trim() || null,
               body.role,
               body.message,
               body.avatar_url ?? null,
