@@ -36,12 +36,25 @@ function nowJst(): string {
 }
 
 /**
- * 開催日時が過去になった upcoming イベントを自動的に completed に変更する
+ * 開催日時が過去になった upcoming イベントを自動的に completed に変更する。
+ * event_date が日付のみ（時刻部分が 00:00:00）の場合は当日23:59:59まで upcoming を維持する。
  */
 async function autoCompleteEvents(db: D1Database): Promise<void> {
+  const now = nowJst();
   await db
-    .prepare(`UPDATE events SET status = 'completed' WHERE status = 'upcoming' AND event_date IS NOT NULL AND event_date < ?`)
-    .bind(nowJst())
+    .prepare(`
+      UPDATE events SET status = 'completed'
+      WHERE status = 'upcoming'
+        AND event_date IS NOT NULL
+        AND (
+          -- 時刻が明示されている場合（秒まで一致しない=00:00:00でない）はそのまま比較
+          (event_date NOT LIKE '%T00:00:00' AND event_date < ?)
+          OR
+          -- 日付のみ or 00:00:00の場合は当日23:59:59を過ぎてから完了扱い
+          (event_date LIKE '%T00:00:00' AND substr(event_date, 1, 10) < substr(?, 1, 10))
+        )
+    `)
+    .bind(now, now)
     .run();
 }
 
